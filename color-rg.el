@@ -1281,6 +1281,7 @@ This assumes that `color-rg-in-string-p' has already returned true, i.e.
      globs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Interactive functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;###autoload
 (defun color-rg-search-input (&optional keyword directory globs file-list)
   (interactive)
   ;; Save window configuration before do search.
@@ -1315,22 +1316,27 @@ This assumes that `color-rg-in-string-p' has already returned true, i.e.
                      search-globs
                      search-file-list)))
 
+;;;###autoload
 (defun color-rg-search-symbol ()
   (interactive)
   (color-rg-search-input (color-rg-pointer-string) default-directory))
 
+;;;###autoload
 (defun color-rg-search-symbol-with-type ()
   (interactive)
   (color-rg-search-input (color-rg-pointer-string) default-directory (color-rg-read-file-type "Filter file by type (default: [ %s ]): ")))
 
+;;;###autoload
 (defun color-rg-search-input-in-current-file ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (buffer-file-name)))
 
+;;;###autoload
 (defun color-rg-search-symbol-in-current-file ()
   (interactive)
   (color-rg-search-input (color-rg-pointer-string) (buffer-file-name)))
 
+;;;###autoload
 (defun color-rg-project-root-dir ()
   "Return root directory of the current project."
   (let ((project (project-current)))
@@ -1340,24 +1346,30 @@ This assumes that `color-rg-in-string-p' has already returned true, i.e.
          ((fboundp 'project-roots) (car (project-roots project))))
       default-directory)))
 
+;;;###autoload
 (defalias 'color-rg-search-input-in-project 'color-rg-search-project)
 
+;;;###autoload
 (defun color-rg-search-project ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (color-rg-project-root-dir)))
 
+;;;###autoload
 (defun color-rg-search-symbol-in-project ()
   (interactive)
   (color-rg-search-input (color-rg-pointer-string) (color-rg-project-root-dir)))
 
+;;;###autoload
 (defun color-rg-search-project-with-type ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (color-rg-project-root-dir) (color-rg-read-file-type "Filter file by type (default: [ %s ]): ")))
 
+;;;###autoload
 (defun color-rg-search-project-rails ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (concat (color-rg-project-root-dir) "app")))
 
+;;;###autoload
 (defun color-rg-search-project-rails-with-type ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (concat (color-rg-project-root-dir) "app") (color-rg-read-file-type "Filter file by type (default: [ %s ]): ")))

@@ -1891,11 +1891,8 @@ Function `move-to-column' can't handle mixed string of Chinese and English corre
             (setq color-rg-temp-visit-buffers (remove (current-buffer) color-rg-temp-visit-buffers))
             ;; Kill target line.
             (goto-line match-line)
-            (color-rg-kill-line)
-            ;; Insert change line.
-            (if (string-equal changed-line-content "")
-                ;; Kill empty line if line mark as deleted.
-                (color-rg-kill-line)
+	    (delete-region (line-beginning-position) (line-end-position))
+            (unless (string-empty-p changed-line-content)
               ;; Otherwise insert new line into file.
               (insert changed-line-content))))
         ;; Save files after change.

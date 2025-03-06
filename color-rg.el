@@ -554,6 +554,8 @@ used to restore window configuration after file content changed.")
   (kill-all-local-variables)
   (setq major-mode 'color-rg-mode)
   (setq mode-name "color-rg")
+  ;; avoid key conflicts with the built-in view-mode
+  (setq-local view-read-only nil)
   (read-only-mode 1)
   (color-rg-highlight-keywords)
   (use-local-map color-rg-mode-map)

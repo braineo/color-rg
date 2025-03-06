@@ -1906,7 +1906,10 @@ Function `move-to-column' can't handle mixed string of Chinese and English corre
             ;; Kill target line.
             (goto-line match-line)
 	    (delete-region (line-beginning-position) (line-end-position))
-            (unless (string-empty-p changed-line-content)
+            ;; Insert change line.
+            (if (string-equal changed-line-content "")
+                ;; Kill empty line if line mark as deleted.
+                (color-rg-kill-line)
               ;; Otherwise insert new line into file.
               (insert changed-line-content))))
         ;; Save files after change.

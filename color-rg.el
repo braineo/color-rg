@@ -554,6 +554,8 @@ used to restore window configuration after file content changed.")
   (kill-all-local-variables)
   (setq major-mode 'color-rg-mode)
   (setq mode-name "color-rg")
+  ;; avoid key conflicts with the built-in view-mode
+  (setq-local view-read-only nil)
   (read-only-mode 1)
   (color-rg-highlight-keywords)
   (use-local-map color-rg-mode-map)
@@ -1279,6 +1281,7 @@ This assumes that `color-rg-in-string-p' has already returned true, i.e.
      globs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Interactive functions ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;###autoload
 (defun color-rg-search-input (&optional keyword directory globs file-list)
   (interactive)
   ;; Save window configuration before do search.
@@ -1313,22 +1316,27 @@ This assumes that `color-rg-in-string-p' has already returned true, i.e.
                      search-globs
                      search-file-list)))
 
+;;;###autoload
 (defun color-rg-search-symbol ()
   (interactive)
   (color-rg-search-input (color-rg-pointer-string) default-directory))
 
+;;;###autoload
 (defun color-rg-search-symbol-with-type ()
   (interactive)
   (color-rg-search-input (color-rg-pointer-string) default-directory (color-rg-read-file-type "Filter file by type (default: [ %s ]): ")))
 
+;;;###autoload
 (defun color-rg-search-input-in-current-file ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (buffer-file-name)))
 
+;;;###autoload
 (defun color-rg-search-symbol-in-current-file ()
   (interactive)
   (color-rg-search-input (color-rg-pointer-string) (buffer-file-name)))
 
+;;;###autoload
 (defun color-rg-project-root-dir ()
   "Return root directory of the current project."
   (let ((project (project-current)))
@@ -1338,24 +1346,30 @@ This assumes that `color-rg-in-string-p' has already returned true, i.e.
          ((fboundp 'project-roots) (car (project-roots project))))
       default-directory)))
 
+;;;###autoload
 (defalias 'color-rg-search-input-in-project 'color-rg-search-project)
 
+;;;###autoload
 (defun color-rg-search-project ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (color-rg-project-root-dir)))
 
+;;;###autoload
 (defun color-rg-search-symbol-in-project ()
   (interactive)
   (color-rg-search-input (color-rg-pointer-string) (color-rg-project-root-dir)))
 
+;;;###autoload
 (defun color-rg-search-project-with-type ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (color-rg-project-root-dir) (color-rg-read-file-type "Filter file by type (default: [ %s ]): ")))
 
+;;;###autoload
 (defun color-rg-search-project-rails ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (concat (color-rg-project-root-dir) "app")))
 
+;;;###autoload
 (defun color-rg-search-project-rails-with-type ()
   (interactive)
   (color-rg-search-input (color-rg-read-input) (concat (color-rg-project-root-dir) "app") (color-rg-read-file-type "Filter file by type (default: [ %s ]): ")))
@@ -1891,7 +1905,8 @@ Function `move-to-column' can't handle mixed string of Chinese and English corre
             (setq color-rg-temp-visit-buffers (remove (current-buffer) color-rg-temp-visit-buffers))
             ;; Kill target line.
             (goto-line match-line)
-            (color-rg-kill-line)
+	    ;; Don't kill invisible content when target line is an org headline
+	    (delete-region (line-beginning-position) (line-end-position))
             ;; Insert change line.
             (if (string-equal changed-line-content "")
                 ;; Kill empty line if line mark as deleted.

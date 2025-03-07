@@ -1905,6 +1905,7 @@ Function `move-to-column' can't handle mixed string of Chinese and English corre
             (setq color-rg-temp-visit-buffers (remove (current-buffer) color-rg-temp-visit-buffers))
             ;; Kill target line.
             (goto-line match-line)
+	    ;; Don't kill invisible content when target line is an org headline
 	    (delete-region (line-beginning-position) (line-end-position))
             ;; Insert change line.
             (if (string-equal changed-line-content "")

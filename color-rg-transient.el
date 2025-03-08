@@ -71,17 +71,34 @@
         (propertize "not set" 'face 'transient-inactive-value)
       (propertize value 'face 'transient-value))))
 
+(defclass color-rg-transient-variable-with-unset (color-rg-transient-variable-with-history)
+  ((unset-label :initarg :unset-label :initform "Unset")))
+
+(cl-defmethod transient-infix-read ((obj color-rg-transient-variable-with-unset))
+  (let* ((history-var (oref obj history-key))
+         (choices (list (cons (oref obj unset-label) nil)
+                       (cons "Set value" t)))
+         (choice (completing-read "Action: " choices nil t)))
+    (if (string= choice (oref obj unset-label))
+        nil  ; Return nil to unset
+      (read-string (concat (oref obj description) ": ")
+                  (oref obj value)
+                  history-var))))
+
 (transient-define-infix color-rg-transient--search ()
   :class 'color-rg-transient-variable-with-history
   :description "Search"
+  :argument "--search="
   :variable 'color-rg-transient--search-value
   :history-key 'color-rg-transient-search-history)
 
 (transient-define-infix color-rg-transient--replace ()
-  :class 'color-rg-transient-variable-with-history
+  :class 'color-rg-transient-variable-with-unset
   :description "Replace"
+  :argument "--replace="
   :variable 'color-rg-transient--replace-value
-  :history-key 'color-rg-transient-replace-history)
+  :history-key 'color-rg-transient-replace-history
+  :unset-label "Unset (search only)")
 
 (transient-define-infix color-rg-transient--include ()
   :class 'color-rg-transient-variable-with-history
@@ -131,22 +148,26 @@
 (transient-define-prefix color-rg-transient ()
   "Color-rg transient menu."
   :value '("--smart-case")
+  :history-key 'color-rg-transient
+  :value (lambda ()
+           (let ((args (transient-get-value)))
+             (or args '("--smart-case"))))
   ["Input"
    ("p" "Search" color-rg-transient--search)
    ("r" "Replace" color-rg-transient--replace)]
-  ["Options"
-   ("s" "Match Case" color-rg-transient--case)
-   ("f" "Literal" color-rg-transient--literal)
-   ("w" "Match whole word" color-rg-transient--word)
-   ("h" "Search Hidden" color-rg-transient--hidden)]
-  ["Scope"
-   ("b" "Current buffer" color-rg-transient--buffer)
-   ("u" "Unrestricted" color-rg-transient--unrestricted)
-   ("i" "Include" color-rg-transient--include)
-   ("x" "Exclude" color-rg-transient--exclude)]
-  [["Actions"
-    ("RET" "Execute" color-rg-transient-execute)
-    ("q" "Quit" transient-quit-all)]]
+  [["Options"
+    ("s" "Match Case" color-rg-transient--case)
+    ("f" "Literal" color-rg-transient--literal)
+    ("w" "Match whole word" color-rg-transient--word)
+    ("h" "Search Hidden" color-rg-transient--hidden)]
+   ["Scope"
+    ("b" "Current buffer" color-rg-transient--buffer)
+    ("u" "Unrestricted" color-rg-transient--unrestricted)
+    ("i" "Include" color-rg-transient--include)
+    ("x" "Exclude" color-rg-transient--exclude)]]
+  ["Actions"
+   [("RET" "Execute" color-rg-transient-execute)]
+   [("q" "Quit" transient-quit-all)]]
   (interactive)
   (transient-setup 'color-rg-transient))
 
@@ -156,7 +177,9 @@
       ""))
 
 (defun color-rg-transient--get-replace-term ()
-  (transient-arg-value "--replace=" (transient-args 'color-rg-transient)))
+  (let ((replace-value (transient-arg-value "--replace=" (transient-args 'color-rg-transient))))
+    (when (and replace-value (not (string-empty-p replace-value)))
+      replace-value)))
 
 (defun color-rg-transient-execute ()
   "Execute color-rg search/replace based on transient arguments."
@@ -185,7 +208,7 @@
                           nil  ; no-node
                           case-sensitive)
           ;; Then trigger replace
-          (color-rg-replace-all-matches))
+          (color-rg-replace-all-matches replace-term))
       ;; Just search
       (color-rg-search search-term
                        (if current-buffer buffer-file-name default-directory)

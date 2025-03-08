@@ -60,10 +60,13 @@
   (oset obj value (transient-get-value)))
 
 (cl-defmethod transient-infix-read ((obj color-rg-transient-variable-with-history))
-  (let ((history-var (oref obj history-key)))
-    (read-string (concat (oref obj description) ": ")
-                (oref obj value)
-                history-var)))
+  (let* ((history-var (oref obj history-key))
+         (value (read-string (concat (oref obj description) ": ")
+                           (oref obj value)
+                           history-var)))
+    ;; Save state after each value change
+    (transient-set)
+    value))
 
 (cl-defmethod transient-format-value ((obj color-rg-transient-variable-with-history))
   (let ((value (oref obj value)))
@@ -78,12 +81,15 @@
   (let* ((history-var (oref obj history-key))
          (choices (list (cons (oref obj unset-label) nil)
                        (cons "Set value" t)))
-         (choice (completing-read "Action: " choices nil t)))
-    (if (string= choice (oref obj unset-label))
-        nil  ; Return nil to unset
-      (read-string (concat (oref obj description) ": ")
-                  (oref obj value)
-                  history-var))))
+         (choice (completing-read "Action: " choices nil t))
+         (value (if (string= choice (oref obj unset-label))
+                   nil  ; Return nil to unset
+                 (read-string (concat (oref obj description) ": ")
+                            (oref obj value)
+                            history-var))))
+    ;; Save state after each value change
+    (transient-set)
+    value))
 
 (transient-define-infix color-rg-transient--search ()
   :class 'color-rg-transient-variable-with-history
@@ -117,6 +123,7 @@
   :class 'transient-switches
   :argument-format "%s"
   :argument-regexp "\\(--ignore-case\\|--smart-case\\)"
+  :init-value (lambda (obj) (oset obj value "--smart-case"))
   :choices '("--ignore-case" "--smart-case"))
 
 (transient-define-argument color-rg-transient--literal ()
@@ -147,11 +154,10 @@
 ;;;###autoload (autoload 'color-rg-transient "color-rg-transient" nil t)
 (transient-define-prefix color-rg-transient ()
   "Color-rg transient menu."
-  :value '("--smart-case")
+  :value '("--color-rg-transient")
+  :save-history t
   :history-key 'color-rg-transient
-  :value (lambda ()
-           (let ((args (transient-get-value)))
-             (or args '("--smart-case"))))
+
   ["Input"
    ("p" "Search" color-rg-transient--search)
    ("r" "Replace" color-rg-transient--replace)]
@@ -194,7 +200,7 @@
          (exclude (transient-arg-value "--exclude=" args)))
 
     ;; Save state for next time
-    (transient-set-value 'color-rg-transient args)
+    (transient-save)
 
     (if replace-term
         (progn
@@ -218,5 +224,15 @@
                        nil  ; no-ignore
                        nil  ; no-node
                        case-sensitive))))
+
+;; Load saved history when the package is loaded
+(with-eval-after-load 'color-rg-transient
+  (when (file-exists-p color-rg-transient-history-file)
+    (load color-rg-transient-history-file t)))
+
+;; Save history before exiting Emacs
+(add-hook 'kill-emacs-hook
+          (lambda ()
+            (transient-save-history)))
 
 (provide 'color-rg-transient)

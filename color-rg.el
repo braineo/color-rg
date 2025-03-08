@@ -1,4 +1,4 @@
-;;; color-rg.el --- Search and refacotry code with rg
+;;; color-rg.el --- Search and refacotry code with rg -*- lexical-binding: t; -*-
 
 ;; Filename: color-rg.el
 ;; Description: Search and refacotry code with rg
@@ -1211,7 +1211,7 @@ This assumes that `color-rg-in-string-p' has already returned true, i.e.
         (setq start (point))
         (setq filename (buffer-substring-no-properties start end))
         (end-of-line)
-        (add-to-list 'file-extensions (color-rg-file-extension filename))))
+        (push 'file-extensions (color-rg-file-extension filename))))
     (if (< (length file-extensions) 2)
         (message (format "Has one type files now."))
       (setq filter-extension (ido-completing-read (if match-files
@@ -1900,7 +1900,7 @@ Function `move-to-column' can't handle mixed string of Chinese and English corre
               (setq match-line (color-rg-get-match-line)))
             ;; Open file in other window.
             (find-file match-file)
-            (add-to-list 'apply-files match-file)
+            (push 'apply-files match-file)
             ;; Remove from temp list if file's buffer is exist.
             (setq color-rg-temp-visit-buffers (remove (current-buffer) color-rg-temp-visit-buffers))
             ;; Kill target line.

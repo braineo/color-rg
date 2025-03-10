@@ -27,19 +27,12 @@
 
 ;;; Code:
 
-
 (require 'transient)
 (require 'color-rg)
 
 (defgroup color-rg-transient nil
   "Transient interface for color-rg."
   :group 'color-rg)
-
-(defcustom color-rg-transient-history-file
-  (expand-file-name "color-rg-transient-history.el" user-emacs-directory)
-  "File to save color-rg transient state history."
-  :type 'file
-  :group 'color-rg-transient)
 
 (defvar color-rg-transient-search-history nil
   "History of search terms.")
@@ -53,67 +46,98 @@
 (defvar color-rg-transient-exclude-history nil
   "History of exclude patterns.")
 
-(defclass color-rg-transient-variable-with-history (transient-variable)
-  ((history-key :initarg :history-key :initform nil)))
+;; Persistent storage for the transient values between sessions
+(defvar color-rg-transient--search-value nil
+  "Store search value between sessions.")
 
-(cl-defmethod transient-init-value ((obj color-rg-transient-variable-with-history))
-  (oset obj value (transient-get-value)))
+(defvar color-rg-transient--replace-value nil
+  "Store replace value between sessions.")
 
-(cl-defmethod transient-infix-read ((obj color-rg-transient-variable-with-history))
-  (let* ((history-var (oref obj history-key))
-         (value (read-string (concat (oref obj description) ": ")
-                           (oref obj value)
-                           history-var)))
-    ;; Save state after each value change
-    (transient-set)
+(defvar color-rg-transient--include-value nil
+  "Store include pattern between sessions.")
+
+(defvar color-rg-transient--exclude-value nil
+  "Store exclude pattern between sessions.")
+
+(defclass color-rg-transient-persistent-variable (transient-variable)
+  ((variable :initarg :variable :initform nil)
+   (history-key :initarg :history-key :initform nil)
+   (default-value :initarg :default-value :initform nil))
+  "Class for color-rg-transient variables that persist between sessions.")
+
+(cl-defmethod transient-init-value ((obj color-rg-transient-persistent-variable))
+  "Initialize the value from the associated variable."
+  (let ((var (oref obj variable))
+        (default (oref obj default-value)))
+    (oset obj value (if (and var (boundp var) (symbol-value var))
+                        (symbol-value var)
+                      default))))
+
+(cl-defmethod transient-infix-set ((obj color-rg-transient-persistent-variable) value)
+  "Set the variable value to persist between sessions."
+  (let ((var (oref obj variable)))
+    (when var
+      (set var value))
+    (oset obj value value)
     value))
 
-(cl-defmethod transient-format-value ((obj color-rg-transient-variable-with-history))
+(cl-defmethod transient-format-value ((obj color-rg-transient-persistent-variable))
+  "Format the value for display."
   (let ((value (oref obj value)))
     (if (or (null value) (string-empty-p value))
         (propertize "not set" 'face 'transient-inactive-value)
       (propertize value 'face 'transient-value))))
 
-(defclass color-rg-transient-variable-with-unset (color-rg-transient-variable-with-history)
-  ((unset-label :initarg :unset-label :initform "Unset")))
+(defclass color-rg-transient-unset-variable (color-rg-transient-persistent-variable)
+  ((unset-label :initarg :unset-label :initform "Unset"))
+  "Class for color-rg-transient variables that can be unset.")
 
-(cl-defmethod transient-infix-read ((obj color-rg-transient-variable-with-unset))
-  (let* ((history-var (oref obj history-key))
-         (choices (list (cons (oref obj unset-label) nil)
-                       (cons "Set value" t)))
+(cl-defmethod transient-infix-read ((obj color-rg-transient-persistent-variable))
+  "Read a string value with history."
+  (let* ((prompt (concat (oref obj description) ": "))
+         (history-var (oref obj history-key))
+         (current (oref obj value))
+         (value (read-string prompt current history-var)))
+    (transient-infix-set obj value)
+    (transient-set)
+    value))
+
+(cl-defmethod transient-infix-read ((obj color-rg-transient-unset-variable))
+  "Read a value or allow unsetting it."
+  (let* ((choices (list (cons (oref obj unset-label) 'unset)
+                       (cons "Set value" 'set)))
          (choice (completing-read "Action: " choices nil t))
+         (history-var (oref obj history-key))
+         (current (oref obj value))
          (value (if (string= choice (oref obj unset-label))
-                   nil  ; Return nil to unset
-                 (read-string (concat (oref obj description) ": ")
-                            (oref obj value)
-                            history-var))))
-    ;; Save state after each value change
+                   nil
+                 (read-string (concat (oref obj description) ": ") 
+                              current history-var))))
+    (transient-infix-set obj value)
     (transient-set)
     value))
 
 (transient-define-infix color-rg-transient--search ()
-  :class 'color-rg-transient-variable-with-history
+  :class 'color-rg-transient-persistent-variable
   :description "Search"
-  :argument "--search="
   :variable 'color-rg-transient--search-value
   :history-key 'color-rg-transient-search-history)
 
 (transient-define-infix color-rg-transient--replace ()
-  :class 'color-rg-transient-variable-with-unset
+  :class 'color-rg-transient-unset-variable
   :description "Replace"
-  :argument "--replace="
   :variable 'color-rg-transient--replace-value
   :history-key 'color-rg-transient-replace-history
   :unset-label "Unset (search only)")
 
 (transient-define-infix color-rg-transient--include ()
-  :class 'color-rg-transient-variable-with-history
+  :class 'color-rg-transient-persistent-variable
   :description "Include"
   :variable 'color-rg-transient--include-value
   :history-key 'color-rg-transient-include-history)
 
 (transient-define-infix color-rg-transient--exclude ()
-  :class 'color-rg-transient-variable-with-history
+  :class 'color-rg-transient-persistent-variable
   :description "Exclude"
   :variable 'color-rg-transient--exclude-value
   :history-key 'color-rg-transient-exclude-history)
@@ -154,8 +178,9 @@
 ;;;###autoload (autoload 'color-rg-transient "color-rg-transient" nil t)
 (transient-define-prefix color-rg-transient ()
   "Color-rg transient menu."
-  :value '("--color-rg-transient")
-  :save-history t
+  :value (lambda ()
+           (let ((values (or (transient-get-value) '("--smart-case"))))
+             values))
   :history-key 'color-rg-transient
 
   ["Input"
@@ -177,29 +202,20 @@
   (interactive)
   (transient-setup 'color-rg-transient))
 
-(defun color-rg-transient--get-search-term ()
-  (or (transient-arg-value "--search=" (transient-args 'color-rg-transient))
-      (car color-rg-transient-search-history)
-      ""))
-
-(defun color-rg-transient--get-replace-term ()
-  (let ((replace-value (transient-arg-value "--replace=" (transient-args 'color-rg-transient))))
-    (when (and replace-value (not (string-empty-p replace-value)))
-      replace-value)))
-
 (defun color-rg-transient-execute ()
   "Execute color-rg search/replace based on transient arguments."
   (interactive)
   (let* ((args (transient-args 'color-rg-transient))
-         (search-term (color-rg-transient--get-search-term))
-         (replace-term (color-rg-transient--get-replace-term))
+         (search-term color-rg-transient--search-value)
+         (replace-term color-rg-transient--replace-value)
          (literal (member "--fixed-strings" args))
          (case-sensitive (member "--smart-case" args))
          (current-buffer (member "--current-buffer" args))
-         (include (transient-arg-value "--include=" args))
-         (exclude (transient-arg-value "--exclude=" args)))
+         (include color-rg-transient--include-value)
+         (exclude color-rg-transient--exclude-value))
 
     ;; Save state for next time
+    (transient-set)
     (transient-save)
 
     (if replace-term
@@ -225,14 +241,5 @@
                        nil  ; no-node
                        case-sensitive))))
 
-;; Load saved history when the package is loaded
-(with-eval-after-load 'color-rg-transient
-  (when (file-exists-p color-rg-transient-history-file)
-    (load color-rg-transient-history-file t)))
-
-;; Save history before exiting Emacs
-(add-hook 'kill-emacs-hook
-          (lambda ()
-            (transient-save-history)))
-
 (provide 'color-rg-transient)
+;;; color-rg-transient.el ends here

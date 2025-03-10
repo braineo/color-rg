@@ -59,6 +59,10 @@
 (defvar color-rg-transient--exclude-value nil
   "Store exclude pattern between sessions.")
 
+;; Save flags between sessions
+(defvar color-rg-transient--saved-flags nil
+  "Store flag values between sessions.")
+
 (defclass color-rg-transient-persistent-variable (transient-variable)
   ((variable :initarg :variable :initform nil)
    (history-key :initarg :history-key :initform nil)
@@ -142,9 +146,32 @@
   :variable 'color-rg-transient--exclude-value
   :history-key 'color-rg-transient-exclude-history)
 
+;; Custom class that saves state when changed
+(defclass color-rg-transient-flag (transient-switches)
+  ()
+  "A transient-switches class that saves flags when changed.")
+
+(cl-defmethod transient-infix-set ((obj color-rg-transient-flag) value)
+  "Set the value and save all flags."
+  (cl-call-next-method obj value)
+  ;; Save the new state of all flags
+  (setq color-rg-transient--saved-flags (transient-args 'color-rg-transient))
+  (transient-set))
+
+(defclass color-rg-transient-switch (transient-switch)
+  ()
+  "A transient-switch class that saves flags when changed.")
+
+(cl-defmethod transient-infix-set ((obj color-rg-transient-switch) value)
+  "Set the value and save all flags."
+  (cl-call-next-method obj value)
+  ;; Save the new state of all flags
+  (setq color-rg-transient--saved-flags (transient-args 'color-rg-transient))
+  (transient-set))
+
 (transient-define-argument color-rg-transient--case ()
   :description "Match Case"
-  :class 'transient-switches
+  :class 'color-rg-transient-flag
   :argument-format "%s"
   :argument-regexp "\\(--ignore-case\\|--smart-case\\)"
   :init-value (lambda (obj) (oset obj value "--smart-case"))
@@ -152,35 +179,36 @@
 
 (transient-define-argument color-rg-transient--literal ()
   :description "Literal"
-  :class 'transient-switch
+  :class 'color-rg-transient-switch
   :argument "--fixed-strings")
 
 (transient-define-argument color-rg-transient--word ()
   :description "Match whole word"
-  :class 'transient-switch
+  :class 'color-rg-transient-switch
   :argument "--word-regexp")
 
 (transient-define-argument color-rg-transient--hidden ()
   :description "Search Hidden"
-  :class 'transient-switch
+  :class 'color-rg-transient-switch
   :argument "--hidden")
 
 (transient-define-argument color-rg-transient--buffer ()
   :description "Current buffer"
-  :class 'transient-switch
+  :class 'color-rg-transient-switch
   :argument "--current-buffer")
 
 (transient-define-argument color-rg-transient--unrestricted ()
   :description "Unrestricted"
-  :class 'transient-switch
+  :class 'color-rg-transient-switch
   :argument "--unrestricted")
 
 ;;;###autoload (autoload 'color-rg-transient "color-rg-transient" nil t)
 (transient-define-prefix color-rg-transient ()
   "Color-rg transient menu."
   :value (lambda ()
-           (let ((values (or (transient-get-value) '("--smart-case"))))
-             values))
+           (if color-rg-transient--saved-flags
+               color-rg-transient--saved-flags
+             '("--smart-case")))
   :history-key 'color-rg-transient
 
   ["Input"
@@ -213,9 +241,9 @@
          (current-buffer (member "--current-buffer" args))
          (include color-rg-transient--include-value)
          (exclude color-rg-transient--exclude-value))
-
+    ;; Make sure we have the latest flags
+    (setq color-rg-transient--saved-flags args)
     ;; Save state for next time
-    (transient-set)
     (transient-save)
 
     (if replace-term

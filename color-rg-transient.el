@@ -115,7 +115,7 @@
          (current (oref obj value))
          (value (if (string= choice (oref obj unset-label))
                    nil
-                 (read-string (concat (oref obj description) ": ") 
+                 (read-string (concat (oref obj description) ": ")
                               current history-var))))
     (transient-infix-set obj value)
     (transient-set)
@@ -135,43 +135,31 @@
   :unset-label "Unset (search only)")
 
 (transient-define-infix color-rg-transient--include ()
-  :class 'color-rg-transient-persistent-variable
+  :class 'color-rg-transient-unset-variable
   :description "Include"
   :variable 'color-rg-transient--include-value
-  :history-key 'color-rg-transient-include-history)
+  :history-key 'color-rg-transient-include-history
+  :unset-label "Unset")
 
 (transient-define-infix color-rg-transient--exclude ()
-  :class 'color-rg-transient-persistent-variable
+  :class 'color-rg-transient-unset-variable
   :description "Exclude"
   :variable 'color-rg-transient--exclude-value
-  :history-key 'color-rg-transient-exclude-history)
+  :history-key 'color-rg-transient-exclude-history
+  :unset-label "Unset")
 
-;; Custom class that saves state when changed
-(defclass color-rg-transient-flag (transient-switches)
-  ()
-  "A transient-switches class that saves flags when changed.")
-
-(cl-defmethod transient-infix-set ((obj color-rg-transient-flag) value)
-  "Set the value and save all flags."
-  (cl-call-next-method obj value)
-  ;; Save the new state of all flags
-  (setq color-rg-transient--saved-flags (transient-args 'color-rg-transient))
-  (transient-set))
-
-(defclass color-rg-transient-switch (transient-switch)
-  ()
-  "A transient-switch class that saves flags when changed.")
-
-(cl-defmethod transient-infix-set ((obj color-rg-transient-switch) value)
-  "Set the value and save all flags."
-  (cl-call-next-method obj value)
-  ;; Save the new state of all flags
-  (setq color-rg-transient--saved-flags (transient-args 'color-rg-transient))
-  (transient-set))
+;; Define a method that applies to any transient-suffix to save state
+(cl-defmethod transient-infix-set :after ((_ transient-infix) _value)
+  "Save all flags after any transient value is set."
+  (when (and transient--prefix
+             (eq (oref transient--prefix command) 'color-rg-transient))
+    (let ((args (transient-args 'color-rg-transient)))
+      (setq color-rg-transient--saved-flags args)
+      (transient-set))))
 
 (transient-define-argument color-rg-transient--case ()
   :description "Match Case"
-  :class 'color-rg-transient-flag
+  :class 'transient-switches
   :argument-format "%s"
   :argument-regexp "\\(--ignore-case\\|--smart-case\\)"
   :init-value (lambda (obj) (oset obj value "--smart-case"))
@@ -179,27 +167,27 @@
 
 (transient-define-argument color-rg-transient--literal ()
   :description "Literal"
-  :class 'color-rg-transient-switch
+  :class 'transient-switch
   :argument "--fixed-strings")
 
 (transient-define-argument color-rg-transient--word ()
   :description "Match whole word"
-  :class 'color-rg-transient-switch
+  :class 'transient-switch
   :argument "--word-regexp")
 
 (transient-define-argument color-rg-transient--hidden ()
   :description "Search Hidden"
-  :class 'color-rg-transient-switch
+  :class 'transient-switch
   :argument "--hidden")
 
 (transient-define-argument color-rg-transient--buffer ()
   :description "Current buffer"
-  :class 'color-rg-transient-switch
+  :class 'transient-switch
   :argument "--current-buffer")
 
 (transient-define-argument color-rg-transient--unrestricted ()
   :description "Unrestricted"
-  :class 'color-rg-transient-switch
+  :class 'transient-switch
   :argument "--unrestricted")
 
 ;;;###autoload (autoload 'color-rg-transient "color-rg-transient" nil t)
@@ -241,8 +229,10 @@
          (current-buffer (member "--current-buffer" args))
          (include color-rg-transient--include-value)
          (exclude color-rg-transient--exclude-value))
+
     ;; Make sure we have the latest flags
     (setq color-rg-transient--saved-flags args)
+
     ;; Save state for next time
     (transient-save)
 
